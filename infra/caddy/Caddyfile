@@ -1,0 +1,74 @@
+# ============================================================================
+#  Caddyfile — ACC Operation System
+#  Cloudflare Tunnel ทำ TLS ขาออกอยู่แล้ว จึงให้ Caddy ฟัง HTTP ที่ localhost
+#  (ถ้าจะเปิดตรงจาก internet ให้เปลี่ยน :8080 เป็นชื่อโดเมนจริง Caddy จะออก
+#   ใบรับรอง Let's Encrypt ให้อัตโนมัติ)
+# ============================================================================
+
+{
+	admin off
+	servers {
+		trusted_proxies static 127.0.0.1/32 ::1
+	}
+}
+
+:8080 {
+	encode zstd gzip
+
+	# --- security headers ---------------------------------------------------
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		Permissions-Policy        "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+
+	# --- Supabase API (PostgREST / GoTrue / Storage / Realtime / Functions) --
+	handle /rest/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /auth/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /storage/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /realtime/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /functions/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# --- LINE / Manus webhook: เปิดสาธารณะได้แต่ต้อง verify signature ในตัว
+	#     function เอง (lineWebhook ตรวจ X-Line-Signature) -----------------
+	handle /webhook/* {
+		uri strip_prefix /webhook
+		rewrite * /functions/v1{uri}
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# --- frontend (SPA) -----------------------------------------------------
+	handle {
+		root * /srv/site
+		try_files {path} /index.html
+		file_server
+
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		@html path / /index.html
+		header @html Cache-Control "no-cache, must-revalidate"
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size     50MiB
+			roll_keep     10
+			roll_keep_for 720h
+		}
+		format json
+	}
+}

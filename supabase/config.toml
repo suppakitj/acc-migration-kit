@@ -1,0 +1,198 @@
+# supabase/config.toml — function settings
+# verify_jwt=false เฉพาะ webhook (LINE/Manus ยิงเข้ามาโดยไม่มี JWT ของเรา)
+# cron functions ถูกยิงด้วย service key (Authorization header จาก pg_cron) → verify_jwt=true ได้
+
+[functions.autoCleanup]
+verify_jwt = true
+
+[functions.autoGenerateMonthlyTasks]
+verify_jwt = true
+
+[functions.backfillReviewDeadline]
+verify_jwt = true
+
+[functions.browseLineDrive]
+verify_jwt = true
+
+[functions.checkGdriveConnection]
+verify_jwt = true
+
+[functions.cleanupAuditLog]
+verify_jwt = true
+
+[functions.credentialManager]
+verify_jwt = true
+
+[functions.customerDeleteManager]
+verify_jwt = true
+
+[functions.directorManager]
+verify_jwt = true
+
+[functions.downloadFolderZip]
+verify_jwt = true
+
+[functions.downloadMultipleFiles]
+verify_jwt = true
+
+[functions.emailDueDateReminder]
+verify_jwt = true
+
+[functions.generateMonthlyTasks]
+verify_jwt = true
+
+[functions.generateTaxDeadlines]
+verify_jwt = true
+
+[functions.holidayApi]
+verify_jwt = true
+
+[functions.kbPendingReminder]
+verify_jwt = true
+
+[functions.lineBillingReminder]
+verify_jwt = true
+
+[functions.lineDueDateReminder]
+verify_jwt = true
+
+[functions.lineNotifyTask]
+verify_jwt = true
+
+[functions.lineSendMessage]
+verify_jwt = true
+
+[functions.lineWebhook]
+verify_jwt = false
+
+[functions.listGroupMembers]
+verify_jwt = true
+
+[functions.listLineChats]
+verify_jwt = true
+
+[functions.listLineMessages]
+verify_jwt = true
+
+[functions.listUsers]
+verify_jwt = true
+
+[functions.manualRetryDriveSave]
+verify_jwt = true
+
+[functions.manusWebhook]
+verify_jwt = false
+
+[functions.markAllLineRead]
+verify_jwt = true
+
+[functions.markLineMessagesRead]
+verify_jwt = true
+
+[functions.meetingActionReminder]
+verify_jwt = true
+
+[functions.peakLicenseReminder]
+verify_jwt = true
+
+[functions.pollOcrResult]
+verify_jwt = true
+
+[functions.registerManusWebhook]
+verify_jwt = true
+
+[functions.retryDriveSave]
+verify_jwt = true
+
+[functions.retryMonthlyTaskGeneration]
+verify_jwt = true
+
+[functions.riskScoreAlert]
+verify_jwt = true
+
+[functions.saveLineFileToDrive]
+verify_jwt = true
+
+[functions.seedTaxTemplates]
+verify_jwt = true
+
+[functions.submitOcr]
+verify_jwt = true
+
+[functions.syncPeakLicense]
+verify_jwt = true
+
+[functions.syncPeakToCustomer]
+verify_jwt = true
+
+[functions.taxDeadlineReminder]
+verify_jwt = true
+
+[functions.taxqaParseFile]
+verify_jwt = true
+
+[functions.taxqaReview]
+verify_jwt = true
+
+[functions.taxqaValidate]
+verify_jwt = true
+
+[functions.testEmailConnection]
+verify_jwt = true
+
+[functions.testLineConnection]
+verify_jwt = true
+
+[functions.testO365Connection]
+verify_jwt = true
+
+[functions.todoEmailReminder]
+verify_jwt = true
+
+[functions.updateUser]
+verify_jwt = true
+
+[functions.uploadFindingFile]
+verify_jwt = true
+
+[functions.uploadKbFile]
+verify_jwt = true
+
+[functions.weeklyPostponeSummary]
+verify_jwt = true
+
+# --- integration/auth functions ที่สร้างใหม่ ---
+[functions.invokeLLM]
+verify_jwt = true
+[functions.extractDataFromFile]
+verify_jwt = true
+[functions.sendEmail]
+verify_jwt = true
+[functions.inviteUser]
+verify_jwt = true
+[functions.googleOAuthStart]
+verify_jwt = true
+[functions.googleOAuthCallback]
+verify_jwt = false
+
+# --- LINE request-triage functions (เพิ่มรอบสอง) ---
+[functions.backfillTriageStatus]
+verify_jwt = true
+[functions.cleanupOtherActionable]
+verify_jwt = true
+[functions.detectLineRequest]
+verify_jwt = true
+[functions.lineAckRequest]
+verify_jwt = true
+[functions.seedRequestKeywords]
+verify_jwt = true
+
+# --- ฟีเจอร์ใหม่: LINE→task SLA, filing tracker, ops health ---
+[functions.createTaskFromRequest]
+verify_jwt = true
+[functions.autoConvertRequests]
+verify_jwt = true
+[functions.generateFilings]
+verify_jwt = true
+[functions.opsHealth]
+verify_jwt = true

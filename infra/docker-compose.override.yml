@@ -1,0 +1,135 @@
+# ============================================================================
+#  docker-compose.override.yml
+#  วางไฟล์นี้ในโฟลเดอร์เดียวกับ docker-compose.yml ของ supabase/docker
+#  → ทับค่า default ที่ไม่ปลอดภัย/ไม่เหมาะกับ on-prem โดยไม่ต้องแก้ไฟล์ต้นฉบับ
+#    (ทำให้ upgrade Supabase ทีหลังง่ายขึ้นมาก — pull ใหม่แล้ว override ยังอยู่)
+# ============================================================================
+services:
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL — tuning สำหรับเครื่อง acc-front (RAM 8 GB)
+  #   Supabase รัน ~10 container ต้องเผื่อ RAM ให้ตัวอื่น + OS + npm build
+  #   ค่าสำหรับ 32 GB ใส่ในคอมเมนต์ท้ายบรรทัด (ถ้าอัป RAM ในอนาคต)
+  # --------------------------------------------------------------------------
+  db:
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - shared_buffers=1536MB          # 32GB → 8GB
+      - -c
+      - effective_cache_size=4GB       # 32GB → 24GB
+      - -c
+      - work_mem=12MB                  # 32GB → 32MB
+      - -c
+      - maintenance_work_mem=256MB     # 32GB → 1GB
+      - -c
+      - max_connections=100            # 32GB → 200
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /wal-archive/%f && cp %p /wal-archive/%f
+      - -c
+      - full_page_writes=on          # ไฟดับกลาง write → กัน page corruption
+      - -c
+      - synchronous_commit=on        # on-prem ไม่มี HA จึงยอมแลก throughput
+      - -c
+      - log_min_duration_statement=2000
+      - -c
+      - shared_preload_libraries=pg_stat_statements,pg_cron
+      - -c
+      - cron.database_name=postgres
+    volumes:
+      - ./volumes/wal-archive:/wal-archive
+    deploy:
+      resources:
+        limits:
+          memory: 3G                   # 32GB → 16G ; บน 8GB จำกัดไม่ให้ DB กิน RAM ตัวอื่น
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -h localhost']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # --------------------------------------------------------------------------
+  # GoTrue (auth) — email + password, invite-only
+  # --------------------------------------------------------------------------
+  auth:
+    restart: unless-stopped
+    environment:
+      GOTRUE_DISABLE_SIGNUP: 'true'              # << สำคัญที่สุด: คนนอกสมัครเองไม่ได้
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      GOTRUE_MAILER_AUTOCONFIRM: 'false'
+      GOTRUE_SMTP_HOST: smtp.office365.com
+      GOTRUE_SMTP_PORT: '587'
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      GOTRUE_SMTP_SENDER_NAME: ACC Operation System
+      GOTRUE_JWT_EXP: '3600'                     # access token 1 ชม.
+      GOTRUE_PASSWORD_MIN_LENGTH: '12'
+      GOTRUE_MFA_ENABLED: 'true'                 # TOTP — บังคับใช้กับ role admin ที่ชั้นแอป
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: 'true'
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: '10'
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: '30'
+      GOTRUE_SITE_URL: ${APP_ORIGIN}
+      GOTRUE_URI_ALLOW_LIST: ${APP_ORIGIN}/*
+
+  # --------------------------------------------------------------------------
+  # PostgREST — ไม่ตั้ง db-max-rows เพราะรายงานบางหน้าขอ 10,000 แถว
+  # (shim ฝั่งแอปไล่หน้าให้แล้ว แต่ไม่อยากให้ถูกตัดเงียบ ๆ ถ้ามีคนเรียกตรง)
+  # --------------------------------------------------------------------------
+  rest:
+    restart: unless-stopped
+    environment:
+      PGRST_DB_AGGREGATES_ENABLED: 'true'
+      PGRST_DB_MAX_ROWS: '10000'
+      PGRST_JWT_AUD: authenticated
+
+  storage:
+    restart: unless-stopped
+    environment:
+      FILE_SIZE_LIMIT: '104857600'               # 100 MB
+      UPLOAD_FILE_SIZE_LIMIT: '104857600'
+
+  functions:
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      HOLIDAY_API_KEY: ${HOLIDAY_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+
+  # --------------------------------------------------------------------------
+  # Studio — ผูกกับ 127.0.0.1 เท่านั้น เข้าถึงผ่าน Tailscale
+  # ห้าม expose ออก internet เด็ดขาด
+  # --------------------------------------------------------------------------
+  studio:
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3000:3000'
+
+  kong:
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8000:8000'                    # Caddy เป็นตัวเดียวที่คุยกับ Kong
+
+  # --------------------------------------------------------------------------
+  # Caddy — เสิร์ฟ frontend (dist/) + reverse proxy ไป Kong
+  # --------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/site:/srv/site:ro                # ผลลัพธ์ npm run build
+      - ./volumes/caddy-data:/data
+      - ./volumes/caddy-config:/config
+    depends_on:
+      - kong

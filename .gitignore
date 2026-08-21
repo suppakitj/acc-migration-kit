@@ -1,0 +1,6 @@
+.env
+.env.local
+*.report.json
+acc-export-*.json
+volumes/
+caddy/site/
